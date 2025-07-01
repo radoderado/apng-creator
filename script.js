@@ -72,13 +72,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     createBtn.addEventListener('click', createAPNG);
 
+    const resetBtn = document.getElementById('reset-btn');
+    resetBtn.addEventListener('click', () => {
+        // ファイルリストのクリア
+        pngFiles = [];
+        fileList.innerHTML = '';
+        
+        // プレビューのクリア
+        previewImg.src = '';
+        previewDiv.style.display = 'none';
+        
+        // ダウンロードリンクのクリア
+        downloadLink.href = '#';
+        downloadLink.download = '';
+        
+        // ボタンのリセット
+        createBtn.disabled = true;
+        createBtn.textContent = 'APNGを作成';
+        
+        // ステータスメッセージのクリア
+        statusDiv.textContent = '';
+    });
+
     // --- Functions ---
     function handleFiles(files) {
-        const newFiles = Array.from(files).filter(file => file.type === 'image/png');
+        const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+        const newFiles = Array.from(files)
+            .filter(file => file.type === 'image/png')
+            .filter(file => {
+                if (file.size > MAX_FILE_SIZE) {
+                    alert(`ファイルサイズが大きすぎます。${file.name}は${Math.round(file.size / 1024 / 1024)}MBで、最大50MBを超過しています。`);
+                    return false;
+                }
+                return true;
+            });
+
         if (newFiles.length === 0) {
             alert('PNGファイルを選択してください。');
             return;
         }
+
         pngFiles = [...pngFiles, ...newFiles].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         updateFileList();
         createBtn.disabled = false;
@@ -110,6 +143,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // ワーカーに処理を依頼します
             worker.postMessage({ fileBuffers, delay }, fileBuffers);
+
+            // メモリリーク対策：ファイルデータのクリア
+            fileBuffers.forEach(buffer => {
+                if (buffer instanceof ArrayBuffer) {
+                    buffer.byteLength = 0;
+                }
+            });
 
         } catch (error) {
             console.error('ファイル読み込み中にエラー:', error);
