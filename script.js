@@ -92,6 +92,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // ステータスメッセージのクリア
         statusDiv.textContent = '';
+        
+        // ワーカーを終了
+        if (worker) {
+            worker.terminate();
+        }
+        
+        // ページをリロード
+        location.reload();
     });
 
     // --- Functions ---
