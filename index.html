@@ -37,10 +37,31 @@
             <img id="preview-img" src="" alt="APNG Preview">
             <a id="download-link" href="#" download="animation.png">APNGをダウンロード</a>
         </div>
+
+        <div id="video-converter" style="display:none;">
+            <h2>MP4 to WebM Converter</h2>
+            <div id="video-drop-zone" class="drop-zone">
+                <p>ここにMP4ファイルをドラッグ＆ドロップ</p>
+                <p>または</p>
+                <label for="video-input" class="file-label">MP4ファイルを選択</label>
+                <input type="file" id="video-input" accept="video/mp4">
+            </div>
+            <div id="video-controls">
+                <button id="convert-btn" disabled>WebMに変換</button>
+                <button id="video-reset-btn">リセット</button>
+            </div>
+            <div id="video-preview-area" style="display:none;">
+                <h3>プレビュー</h3>
+                <video id="video-preview" controls></video>
+                <a id="video-download-link" href="#" download="converted.webm">WebMをダウンロード</a>
+            </div>
+        </div>
     </div>
 
         <script src="pako.v1.0.7.js"></script>
     <script src="upng.v1.4.2.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
+    <script src="ffmpeg-setup.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

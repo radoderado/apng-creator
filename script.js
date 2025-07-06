@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const fileList = document.getElementById('file-list');
@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let pngFiles = [];
     let worker;
+    let videoFile = null;
 
     function initializeWorker() {
         worker = new Worker('apng.worker.js');
@@ -51,6 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Listeners ---
+    
+    // APNG Creatorのイベントリスナー
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropZone.classList.add('dragover');
@@ -169,4 +172,90 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize the worker when the DOM is ready
     initializeWorker();
+
+    // Video Converterのイベントリスナー
+    const videoDropZone = document.getElementById('video-drop-zone');
+    const videoInput = document.getElementById('video-input');
+    const videoPreview = document.getElementById('video-preview');
+    const videoPreviewArea = document.getElementById('video-preview-area');
+    const convertBtn = document.getElementById('convert-btn');
+    const videoResetBtn = document.getElementById('video-reset-btn');
+    const videoDownloadLink = document.getElementById('video-download-link');
+    const videoConverter = document.getElementById('video-converter');
+
+    videoDropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        videoDropZone.classList.add('dragover');
+    });
+
+    videoDropZone.addEventListener('dragleave', () => {
+        videoDropZone.classList.remove('dragover');
+    });
+
+    videoDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        videoDropZone.classList.remove('dragover');
+        handleVideoFile(e.dataTransfer.files[0]);
+    });
+
+    videoInput.addEventListener('change', (e) => {
+        handleVideoFile(e.target.files[0]);
+    });
+
+    convertBtn.addEventListener('click', async () => {
+        try {
+            convertBtn.disabled = true;
+            convertBtn.textContent = '変換中...';
+            
+            const webmBlob = await convertToWebM(videoFile);
+            
+            // プレビューを更新
+            videoPreview.src = URL.createObjectURL(webmBlob);
+            videoPreviewArea.style.display = 'block';
+            
+            // ダウンロードリンクを更新
+            videoDownloadLink.href = URL.createObjectURL(webmBlob);
+            videoDownloadLink.download = 'converted.webm';
+            
+            convertBtn.textContent = '変換完了！';
+        } catch (error) {
+            console.error('変換エラー:', error);
+            alert('変換中にエラーが発生しました。');
+            convertBtn.textContent = 'WebMに変換';
+        } finally {
+            convertBtn.disabled = false;
+        }
+    });
+
+    videoResetBtn.addEventListener('click', () => {
+        videoFile = null;
+        videoPreview.src = '';
+        videoPreviewArea.style.display = 'none';
+        convertBtn.disabled = true;
+        convertBtn.textContent = 'WebMに変換';
+        videoDownloadLink.href = '#';
+        videoDownloadLink.download = '';
+        videoConverter.style.display = 'none';
+    });
+
+    function handleVideoFile(file) {
+        if (!file || file.type !== 'video/mp4') {
+            alert('MP4ファイルを選択してください。');
+            return;
+        }
+
+        if (file.size > 50 * 1024 * 1024) { // 50MB制限
+            alert('ファイルサイズが大きすぎます。50MB以下のファイルを選択してください。');
+            return;
+        }
+
+        videoFile = file;
+        videoConverter.style.display = 'block';
+        convertBtn.disabled = false;
+        
+        // プレビューを表示
+        const url = URL.createObjectURL(file);
+        videoPreview.src = url;
+        videoPreviewArea.style.display = 'block';
+    }
 });
