@@ -76,33 +76,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     createBtn.addEventListener('click', createAPNG);
 
     const resetBtn = document.getElementById('reset-btn');
+    // リセットボタンのイベントリスナー
     resetBtn.addEventListener('click', () => {
-        // ファイルリストのクリア
-        pngFiles = [];
-        fileList.innerHTML = '';
-        
-        // プレビューのクリア
-        previewImg.src = '';
-        previewDiv.style.display = 'none';
-        
-        // ダウンロードリンクのクリア
-        downloadLink.href = '#';
-        downloadLink.download = '';
-        
-        // ボタンのリセット
-        createBtn.disabled = true;
-        createBtn.textContent = 'APNGを作成';
-        
-        // ステータスメッセージのクリア
-        statusDiv.textContent = '';
-        
         // ワーカーを終了
         if (worker) {
             worker.terminate();
+            worker = null;
+        }
+
+        // UIをリセット
+        dropZone.classList.remove('dragover');
+        fileList.innerHTML = '';
+        createBtn.disabled = true;
+        previewDiv.style.display = 'none';
+        downloadLink.style.display = 'none';
+        downloadLink.href = '#';
+        downloadLink.download = '';
+        
+        // メモリを解放
+        if (previewImg.src) {
+            previewImg.src = '';
+        }
+        if (previewImg.currentSrc) {
+            URL.revokeObjectURL(previewImg.currentSrc);
         }
         
-        // ページをリロード
-        location.reload();
+        // ファイルリファレンスをクリア
+        if (fileInput.files.length > 0) {
+            fileInput.value = '';
+        }
     });
 
     // --- Functions ---
@@ -198,8 +200,80 @@ document.addEventListener('DOMContentLoaded', async () => {
         handleVideoFile(e.dataTransfer.files[0]);
     });
 
-    videoInput.addEventListener('change', (e) => {
-        handleVideoFile(e.target.files[0]);
+    videoInput.addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            // ファイルサイズチェック (50MBまで)
+            if (file.size > 50 * 1024 * 1024) {
+                alert('ファイルサイズは50MBまでです');
+                return;
+            }
+
+            // プレビューを表示
+            videoPreview.src = URL.createObjectURL(file);
+            videoPreviewArea.style.display = 'block';
+            convertBtn.disabled = false;
+
+            // ファイル情報を表示
+            const videoInfo = document.createElement('p');
+            videoInfo.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+            videoPreviewArea.insertBefore(videoInfo, videoPreview);
+
+        } catch (error) {
+            console.error('ビデオファイルの選択エラー:', error);
+            alert('ビデオファイルの選択に失敗しました');
+        }
+    });
+
+    videoDropZone.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        videoDropZone.classList.add('dragover');
+    });
+
+    videoDropZone.addEventListener('dragleave', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        videoDropZone.classList.remove('dragover');
+    });
+
+    videoDropZone.addEventListener('drop', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        videoDropZone.classList.remove('dragover');
+
+        const file = event.dataTransfer.files[0];
+        if (!file) return;
+
+        // ファイルタイプチェック
+        if (!file.type.startsWith('video/')) {
+            alert('ビデオファイルのみをドロップしてください');
+            return;
+        }
+
+        // ファイルサイズチェック
+        if (file.size > 50 * 1024 * 1024) {
+            alert('ファイルサイズは50MBまでです');
+            return;
+        }
+
+        try {
+            // プレビューを表示
+            videoPreview.src = URL.createObjectURL(file);
+            videoPreviewArea.style.display = 'block';
+            convertBtn.disabled = false;
+
+            // ファイル情報を表示
+            const videoInfo = document.createElement('p');
+            videoInfo.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+            videoPreviewArea.insertBefore(videoInfo, videoPreview);
+
+        } catch (error) {
+            console.error('ビデオファイルのドロップエラー:', error);
+            alert('ビデオファイルのドロップに失敗しました');
+        }
     });
 
     convertBtn.addEventListener('click', async () => {
@@ -227,7 +301,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // ビデオリセットボタンのイベントリスナー
     videoResetBtn.addEventListener('click', () => {
+        // UIをリセット
+        videoDropZone.classList.remove('dragover');
         videoFile = null;
         videoPreview.src = '';
         videoPreviewArea.style.display = 'none';
