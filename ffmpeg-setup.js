@@ -1,12 +1,15 @@
 // FFmpeg.wasmの設定
-const ffmpeg = FFmpeg.createFFmpeg({
-    corePath: 'https://unpkg.com/@ffmpeg/core-dist/ffmpeg-core.js',
-    log: true
-});
+let ffmpeg = null;
 
 // FFmpegの初期化
 async function initFFmpeg() {
-    await ffmpeg.load();
+    if (!ffmpeg) {
+        ffmpeg = FFmpeg.createFFmpeg({
+            corePath: 'https://unpkg.com/@ffmpeg/core-dist/ffmpeg-core.js',
+            log: true
+        });
+        await ffmpeg.load();
+    }
 }
 
 // MP4をWebMに変換する関数
