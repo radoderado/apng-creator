@@ -5,16 +5,20 @@ let ffmpeg = null;
 async function initFFmpeg() {
     if (!window.FFmpeg) {
         console.error('FFmpegライブラリが読み込まれていません');
-        return null;
+        throw new Error('FFmpegライブラリが読み込まれていません');
     }
     
     if (!ffmpeg) {
         ffmpeg = window.FFmpeg.createFFmpeg({
             corePath: 'https://unpkg.com/@ffmpeg/core-dist/ffmpeg-core.js',
-            log: true
+            log: true,
+            progress: (p) => {
+                console.log(`Loading FFmpeg: ${p}%`);
+            }
         });
         try {
             await ffmpeg.load();
+            console.log('FFmpegが正常に初期化されました');
         } catch (error) {
             console.error('FFmpegの初期化に失敗しました:', error);
             throw error;
