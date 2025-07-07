@@ -195,42 +195,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     videoDropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        videoDropZone.classList.remove('dragover');
-        handleVideoFile(e.dataTransfer.files[0]);
-    });
-
-    videoInput.addEventListener('change', async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        try {
-            // ファイルサイズチェック (50MBまで)
-            if (file.size > 50 * 1024 * 1024) {
-                alert('ファイルサイズは50MBまでです');
-                return;
             }
+            return true;
+        });
 
-            // プレビューを表示
-            videoPreview.src = URL.createObjectURL(file);
-            videoPreviewArea.style.display = 'block';
-            convertBtn.disabled = false;
+    if (newFiles.length === 0) {
+        alert('PNGファイルを選択してください。');
+        return;
+    }
 
-            // ファイル情報を表示
-            const videoInfo = document.createElement('p');
-            videoInfo.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
-            videoPreviewArea.insertBefore(videoInfo, videoPreview);
+    pngFiles = [...pngFiles, ...newFiles].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    updateFileList();
+    createBtn.disabled = false;
+}
 
-        } catch (error) {
-            console.error('ビデオファイルの選択エラー:', error);
-            alert('ビデオファイルの選択に失敗しました');
-        }
+function updateFileList() {
+    fileList.innerHTML = '';
+    pngFiles.forEach(file => {
+        const li = document.createElement('li');
+        li.textContent = file.name;
+        fileList.appendChild(li);
     });
+}
 
-    videoDropZone.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        videoDropZone.classList.add('dragover');
+async function createAPNG() {
+    if (pngFiles.length === 0) {
+        alert('APNGに変換するファイルがありません。');
+        return;
+    }
     });
 
     videoDropZone.addEventListener('dragleave', (event) => {
