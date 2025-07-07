@@ -1,204 +1,61 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    const dropZone = document.getElementById('drop-zone');
-    const fileInput = document.getElementById('file-input');
-    const fileList = document.getElementById('file-list');
-    const createBtn = document.getElementById('create-btn');
-    const fpsInput = document.getElementById('fps-input');
-    const previewDiv = document.getElementById('preview-area');
-    const previewImg = document.getElementById('preview-img');
-    const downloadLink = document.getElementById('download-link');
-    const statusDiv = document.getElementById('status');
+// DOM要素の取得
+const dropZone = document.getElementById('drop-zone');
+const fileList = document.getElementById('file-list');
+const fileInput = document.getElementById('file-input');
+const createBtn = document.getElementById('create-btn');
+const previewDiv = document.getElementById('preview-area');
+const previewImg = document.getElementById('preview-img');
+const downloadLink = document.getElementById('download-link');
+const resetBtn = document.getElementById('reset-btn');
+const apngProgressArea = document.getElementById('apng-progress-area');
+const apngProgress = document.getElementById('apng-progress');
+const apngProgressText = document.getElementById('apng-progress-text');
 
-    let pngFiles = [];
-    let worker;
-    let videoFile = null;
+const videoDropZone = document.getElementById('video-drop-zone');
+const videoInput = document.getElementById('video-input');
+const convertBtn = document.getElementById('convert-btn');
+const videoPreview = document.getElementById('video-preview');
+const videoPreviewArea = document.getElementById('video-preview-area');
+const videoDownloadLink = document.getElementById('video-download-link');
+const videoResetBtn = document.getElementById('video-reset-btn');
+const videoProgressArea = document.getElementById('video-progress-area');
+const videoProgress = document.getElementById('video-progress');
+const videoProgressText = document.getElementById('video-progress-text');
 
-    function initializeWorker() {
-        worker = new Worker('apng.worker.js');
+// ワーカー
+let worker = null;
+let pngFiles = [];
 
-        worker.onmessage = (e) => {
-            // Workerからのメッセージを処理します
-            const { apngBuffer, error } = e.data;
-            createBtn.disabled = false; // ボタンを再度有効にします
+// FFmpegのセットアップ
+const { createFFmpeg, fetchFile } = FFmpeg;
+let ffmpeg;
 
-            if (error) {
-                // エラーが発生した場合
-                statusDiv.textContent = `エラー: ${error}`;
-                console.error('An error occurred in the worker:', error);
-                previewDiv.style.display = 'none'; // プレビューを隠します
-            } else if (apngBuffer) {
-                // 成功した場合
-                const blob = new Blob([apngBuffer], { type: 'image/png' });
-                const url = URL.createObjectURL(blob);
 
-                previewImg.src = url;
-                downloadLink.href = url;
-                downloadLink.download = 'animation.png'; // ダウンロードファイル名を設定します
-                previewDiv.style.display = 'block'; // プレビューを表示します
-                statusDiv.textContent = 'APNGが作成されました！プレビューを確認し、ダウンロードしてください。';
-            } else {
-                // 予期せぬデータの場合
-                statusDiv.textContent = 'ワーカーから予期しないデータを受信しました。';
-                previewDiv.style.display = 'none';
-            }
-        };
+// ドラッグ＆ドロップのイベントリスナー
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
 
-        worker.onerror = (e) => {
-            console.error('An error occurred in the worker:', e);
-            alert('ワーカーの初期化中に致命的なエラーが発生しました。');
-            createBtn.disabled = false;
-            createBtn.textContent = 'APNGを作成';
-        };
-    }
+dropZone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+});
 
-    // --- Event Listeners ---
-    
-    // APNG Creatorのイベントリスナー
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+});
 
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('dragover');
-    });
+// ファイル入力のイベントリスナー
+fileInput.addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+});
 
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        handleFiles(e.dataTransfer.files);
-    });
-
-    fileInput.addEventListener('change', (e) => {
-        handleFiles(e.target.files);
-    });
-
-    createBtn.addEventListener('click', createAPNG);
-
-    const resetBtn = document.getElementById('reset-btn');
-    // リセットボタンのイベントリスナー
-    resetBtn.addEventListener('click', () => {
-        // ワーカーを終了
-        if (worker) {
-            worker.terminate();
-            worker = null;
-        }
-
-        // UIをリセット
-        dropZone.classList.remove('dragover');
-        fileList.innerHTML = '';
-        createBtn.disabled = true;
-        previewDiv.style.display = 'none';
-        downloadLink.style.display = 'none';
-        downloadLink.href = '#';
-        downloadLink.download = '';
-        
-        // メモリを解放
-        if (previewImg.src) {
-            previewImg.src = '';
-        }
-        if (previewImg.currentSrc) {
-            URL.revokeObjectURL(previewImg.currentSrc);
-        }
-        
-        // ファイルリファレンスをクリア
-        if (fileInput.files.length > 0) {
-            fileInput.value = '';
-        }
-    });
-
-    // --- Functions ---
-    function handleFiles(files) {
-        const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-        const newFiles = Array.from(files)
-            .filter(file => file.type === 'image/png')
-            .filter(file => {
-                if (file.size > MAX_FILE_SIZE) {
-                    alert(`ファイルサイズが大きすぎます。${file.name}は${Math.round(file.size / 1024 / 1024)}MBで、最大50MBを超過しています。`);
-                    return false;
-                }
-                return true;
-            });
-
-        if (newFiles.length === 0) {
-            alert('PNGファイルを選択してください。');
-            return;
-        }
-
-        pngFiles = [...pngFiles, ...newFiles].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-        updateFileList();
-        createBtn.disabled = false;
-    }
-
-    function updateFileList() {
-        fileList.innerHTML = '';
-        pngFiles.forEach(file => {
-            const li = document.createElement('li');
-            li.textContent = file.name;
-            fileList.appendChild(li);
-        });
-    }
-
-    async function createAPNG() {
-        if (pngFiles.length === 0) {
-            alert('APNGに変換するファイルがありません。');
-            return;
-        }
-
-        createBtn.disabled = true;
-        createBtn.textContent = '画像読み込み中...';
-
-        try {
-            const fileBuffers = await Promise.all(pngFiles.map(file => file.arrayBuffer()));
-            
-            createBtn.textContent = 'APNGを作成中... (時間がかかる場合があります)';
-            const delay = Math.round(1000 / fpsInput.value) || 33;  // fpsからミリ秒に変換
-
-            // ワーカーに処理を依頼します
-            worker.postMessage({ fileBuffers, delay }, fileBuffers);
-
-            // メモリリーク対策：ファイルデータのクリア
-            fileBuffers.forEach(buffer => {
-                if (buffer instanceof ArrayBuffer) {
-                    buffer.byteLength = 0;
-                }
-            });
-
-        } catch (error) {
-            console.error('ファイル読み込み中にエラー:', error);
-            alert('ファイルの読み込み中にエラーが発生しました。');
-            createBtn.disabled = false;
-            createBtn.textContent = 'APNGを作成';
-        }
-    }
-
-    // Initialize the worker when the DOM is ready
-    initializeWorker();
-
-    // Video Converterのイベントリスナー
-    const videoDropZone = document.getElementById('video-drop-zone');
-    const videoInput = document.getElementById('video-input');
-    const videoPreview = document.getElementById('video-preview');
-    const videoPreviewArea = document.getElementById('video-preview-area');
-    const convertBtn = document.getElementById('convert-btn');
-    const videoResetBtn = document.getElementById('video-reset-btn');
-    const videoDownloadLink = document.getElementById('video-download-link');
-    const videoConverter = document.getElementById('video-converter');
-
-    videoDropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        videoDropZone.classList.add('dragover');
-    });
-
-    videoDropZone.addEventListener('dragleave', () => {
-        videoDropZone.classList.remove('dragover');
-    });
-
-    videoDropZone.addEventListener('drop', (e) => {
-            }
-            return true;
-        });
-
+// ファイル処理関数
+function handleFiles(files) {
+    const newFiles = Array.from(files).filter(file => file.type.startsWith('image/png'));
     if (newFiles.length === 0) {
         alert('PNGファイルを選択してください。');
         return;
@@ -218,113 +75,184 @@ function updateFileList() {
     });
 }
 
+// APNG作成関数
 async function createAPNG() {
     if (pngFiles.length === 0) {
         alert('APNGに変換するファイルがありません。');
         return;
     }
-    });
+    createBtn.disabled = true;
+    createBtn.textContent = '作成中...';
+    apngProgressArea.style.display = 'block';
+    apngProgress.value = 0;
+    apngProgressText.textContent = '0%';
 
-    videoDropZone.addEventListener('dragleave', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        videoDropZone.classList.remove('dragover');
-    });
-
-    videoDropZone.addEventListener('drop', async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        videoDropZone.classList.remove('dragover');
-
-        const file = event.dataTransfer.files[0];
-        if (!file) return;
-
-        // ファイルタイプチェック
-        if (!file.type.startsWith('video/')) {
-            alert('ビデオファイルのみをドロップしてください');
-            return;
+    try {
+        if (!worker) {
+            worker = new Worker('apng.worker.js');
         }
 
-        // ファイルサイズチェック
-        if (file.size > 50 * 1024 * 1024) {
-            alert('ファイルサイズは50MBまでです');
-            return;
-        }
+        const fps = parseInt(document.getElementById('fps-input').value) || 30;
+        const delay = Math.round(1000 / fps);
 
-        try {
-            // プレビューを表示
-            videoPreview.src = URL.createObjectURL(file);
-            videoPreviewArea.style.display = 'block';
-            convertBtn.disabled = false;
+        const fileBuffers = await Promise.all(pngFiles.map(file => file.arrayBuffer()));
 
-            // ファイル情報を表示
-            const videoInfo = document.createElement('p');
-            videoInfo.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
-            videoPreviewArea.insertBefore(videoInfo, videoPreview);
+        worker.postMessage({
+            files: fileBuffers,
+            delay: delay
+        });
 
-        } catch (error) {
-            console.error('ビデオファイルのドロップエラー:', error);
-            alert('ビデオファイルのドロップに失敗しました');
-        }
-    });
-
-    convertBtn.addEventListener('click', async () => {
-        try {
-            convertBtn.disabled = true;
-            convertBtn.textContent = '変換中...';
-            
-            const webmBlob = await convertToWebM(videoFile);
-            
-            // プレビューを更新
-            videoPreview.src = URL.createObjectURL(webmBlob);
-            videoPreviewArea.style.display = 'block';
-            
-            // ダウンロードリンクを更新
-            videoDownloadLink.href = URL.createObjectURL(webmBlob);
-            videoDownloadLink.download = 'converted.webm';
-            
-            convertBtn.textContent = '変換完了！';
-        } catch (error) {
-            console.error('変換エラー:', error);
-            alert('変換中にエラーが発生しました。');
-            convertBtn.textContent = 'WebMに変換';
-        } finally {
-            convertBtn.disabled = false;
-        }
-    });
-
-    // ビデオリセットボタンのイベントリスナー
-    videoResetBtn.addEventListener('click', () => {
-        // UIをリセット
-        videoDropZone.classList.remove('dragover');
-        videoFile = null;
-        videoPreview.src = '';
-        videoPreviewArea.style.display = 'none';
-        convertBtn.disabled = true;
-        convertBtn.textContent = 'WebMに変換';
-        videoDownloadLink.href = '#';
-        videoDownloadLink.download = '';
-        videoConverter.style.display = 'none';
-    });
-
-    function handleVideoFile(file) {
-        if (!file || file.type !== 'video/mp4') {
-            alert('MP4ファイルを選択してください。');
-            return;
-        }
-
-        if (file.size > 50 * 1024 * 1024) { // 50MB制限
-            alert('ファイルサイズが大きすぎます。50MB以下のファイルを選択してください。');
-            return;
-        }
-
-        videoFile = file;
-        videoConverter.style.display = 'block';
-        convertBtn.disabled = false;
-        
-        // プレビューを表示
-        const url = URL.createObjectURL(file);
-        videoPreview.src = url;
-        videoPreviewArea.style.display = 'block';
+        worker.onmessage = (e) => {
+            const { type, data } = e.data;
+            if (type === 'progress') {
+                const percent = Math.round(data * 100);
+                apngProgress.value = percent;
+                apngProgressText.textContent = `${percent}%`;
+            } else if (type === 'done') {
+                const blob = data;
+                downloadLink.href = URL.createObjectURL(blob);
+                previewImg.src = downloadLink.href;
+                previewDiv.style.display = 'block';
+                downloadLink.style.display = 'inline-block';
+                apngProgressText.textContent = '完了';
+            } else if (type === 'error') {
+                console.error('APNG作成エラー:', data);
+                alert('APNGの作成に失敗しました: ' + data);
+                apngProgressArea.style.display = 'none';
+            }
+        };
+    } catch (error) {
+        console.error('APNG作成処理エラー:', error);
+        alert('APNGの作成に失敗しました。エラー: ' + error.message);
+        apngProgressArea.style.display = 'none';
+    } finally {
+        createBtn.disabled = false;
+        createBtn.textContent = 'APNGを作成';
     }
+}
+
+// リセットボタンのイベントリスナー
+resetBtn.addEventListener('click', () => {
+    if (worker) {
+        worker.terminate();
+        worker = null;
+    }
+    pngFiles = [];
+    fileList.innerHTML = '';
+    fileInput.value = '';
+    if (previewImg.src) {
+        URL.revokeObjectURL(previewImg.src);
+    }
+    previewImg.src = '';
+    previewDiv.style.display = 'none';
+    downloadLink.href = '#';
+    downloadLink.style.display = 'none';
+    createBtn.disabled = true;
+    apngProgressArea.style.display = 'none';
+});
+
+createBtn.addEventListener('click', createAPNG);
+
+// --- Video Converter ---
+
+function handleVideoFile(file) {
+    if (!file || !file.type.startsWith('video/')) {
+        alert('ビデオファイルを選択してください。');
+        return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+        alert('ファイルサイズは50MBまでです。');
+        return;
+    }
+    videoPreview.src = URL.createObjectURL(file);
+    videoPreviewArea.style.display = 'block';
+    convertBtn.disabled = false;
+
+    const oldInfo = videoPreviewArea.querySelector('p');
+    if (oldInfo) oldInfo.remove();
+
+    const videoInfo = document.createElement('p');
+    videoInfo.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+    videoPreviewArea.insertBefore(videoInfo, videoPreview);
+}
+
+videoInput.addEventListener('change', (e) => handleVideoFile(e.target.files[0]));
+videoDropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    videoDropZone.classList.add('dragover');
+});
+videoDropZone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    videoDropZone.classList.remove('dragover');
+});
+videoDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    videoDropZone.classList.remove('dragover');
+    handleVideoFile(e.dataTransfer.files[0]);
+});
+
+convertBtn.addEventListener('click', async () => {
+    const videoFile = videoInput.files[0];
+    if (!videoFile) {
+        alert('ビデオファイルが選択されていません。');
+        return;
+    }
+
+    convertBtn.disabled = true;
+    convertBtn.textContent = '変換中...';
+    videoProgressArea.style.display = 'block';
+    videoProgress.value = 0;
+    videoProgressText.textContent = '0%';
+
+    try {
+        if (!ffmpeg || !ffmpeg.isLoaded()) {
+             ffmpeg = createFFmpeg({
+                log: true,
+                corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+            });
+            ffmpeg.setProgress(({ ratio }) => {
+                const percent = Math.round(ratio * 100);
+                videoProgress.value = percent;
+                videoProgressText.textContent = `${percent}%`;
+            });
+            await ffmpeg.load();
+        }
+
+        ffmpeg.FS('writeFile', videoFile.name, await fetchFile(videoFile));
+
+        await ffmpeg.run('-i', videoFile.name, '-c:v', 'libvpx-vp9', '-c:a', 'libopus', 'output.webm');
+
+        const data = ffmpeg.FS('readFile', 'output.webm');
+
+        const blob = new Blob([data.buffer], { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+
+        videoDownloadLink.href = url;
+        videoDownloadLink.download = videoFile.name.replace(/\.[^/.]+$/, '') + '.webm';
+        videoDownloadLink.style.display = 'inline-block';
+        videoPreview.src = url;
+        videoProgressText.textContent = '完了';
+
+        alert('変換が完了しました！');
+    } catch (error) {
+        console.error('ビデオ変換エラー:', error);
+        alert('ビデオの変換に失敗しました。');
+        videoProgressArea.style.display = 'none';
+    } finally {
+        convertBtn.disabled = false;
+        convertBtn.textContent = 'WebMに変換';
+    }
+});
+
+videoResetBtn.addEventListener('click', () => {
+    videoInput.value = '';
+    if (videoPreview.src) {
+        URL.revokeObjectURL(videoPreview.src);
+    }
+    videoPreview.src = '';
+    videoPreviewArea.style.display = 'none';
+    videoDownloadLink.href = '#';
+    videoDownloadLink.style.display = 'none';
+    convertBtn.disabled = true;
+    videoProgressArea.style.display = 'none';
 });

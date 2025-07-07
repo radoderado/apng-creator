@@ -36,6 +36,11 @@
                 <button id="reset-btn">リセット</button>
             </div>
 
+            <div id="apng-progress-area" class="progress-area" style="display:none;">
+                <progress id="apng-progress" value="0" max="100"></progress>
+                <span id="apng-progress-text">0%</span>
+            </div>
+
             <div id="preview-area" style="display:none;">
                 <h2>プレビュー</h2>
                 <img id="preview-img" src="" alt="APNG Preview">
@@ -56,6 +61,10 @@
                 <button id="convert-btn" disabled>WebMに変換</button>
                 <button id="video-reset-btn">リセット</button>
             </div>
+            <div id="video-progress-area" class="progress-area" style="display:none;">
+                <progress id="video-progress" value="0" max="100"></progress>
+                <span id="video-progress-text">0%</span>
+            </div>
             <div id="video-preview-area" style="display:none;">
                 <h3>プレビュー</h3>
                 <video id="video-preview" controls></video>
@@ -64,10 +73,9 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pako@1.0.7/dist/pako.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/upng-js@1.4.2/dist/upng.min.js"></script>
-    <script src="ffmpeg-setup.js"></script>
+    <script src="pako.js"></script>
+    <script src="upng.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.0/dist/ffmpeg.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
